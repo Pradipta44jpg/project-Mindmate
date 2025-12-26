@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project1 -- MindMate</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f2f2f2;
+            padding: 20px;
+        }
+
+        #chat-box {
+            background: white;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            border-radius: 5px;
+        }
+
+        input {
+            width: 80%;
+            padding: 10px;
+        }
+
+        button {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        #micBtn.listening {
+            background-color: #ffcccc;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>MindMate 💙</h2>
+
+<div id="chat-box"></div><br>
+
+<input type="text" id="user-input" placeholder="Type how you feel..." />
+<button onclick="sendMessage()">Send</button>
+
+<br><br>
+
+<button id="micBtn">🎤 Speak</button>
+<p id="speechStatus"></p>
+
+<script>
+const micBtn = document.getElementById("micBtn");
+const statusText = document.getElementById("speechStatus");
+
+const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition;
+
+if (!SpeechRecognition) {
+    statusText.innerText = "Speech recognition not supported in this browser.";
+} else {
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    micBtn.onclick = () => {
+        micBtn.disabled = true;
+        micBtn.classList.add("listening");
+        statusText.innerText = "🎤 Listening... Please speak";
+
+        recognition.start();
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+
+        if (transcript.length === 0) {
+            statusText.innerText = "I couldn’t hear anything. Try again.";
+        } else {
+            statusText.innerText = "You said: " + transcript;
+            sendVoiceMessage(transcript);
+        }
+    };
+
+    recognition.onerror = () => {
+        statusText.innerText = "Speech error. Please try again.";
+    };
+
+    recognition.onend = () => {
+        micBtn.disabled = false;
+        micBtn.classList.remove("listening");
+    };
+}
+
+// Text input
+async function sendMessage() {
+    let text = document.getElementById("user-input").value.trim();
+    if (!text) return;
+
+    await sendToBackend(text);
+    document.getElementById("user-input").value = "";
+}
+
+// Voice input
+async function sendVoiceMessage(text) {
+    await sendToBackend(text);
+}
+
+// Common backend call
+async function sendToBackend(text) {
+    let chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
+
+    try {
+        let response = await fetch("http://127.0.0.1:5000/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text })
+        });
+
+        let data = await response.json();
+        chatBox.innerHTML += `<p><b>MindMate:</b> ${data.reply}</p>`;
+    } catch {
+        chatBox.innerHTML += `<p style="color:red">Error connecting to server</p>`;
+    }
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+</script>
+
+</body>
+</html>
