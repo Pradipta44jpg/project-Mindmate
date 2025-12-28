@@ -5,7 +5,7 @@
 
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             background: #f2f2f2;
             padding: 20px;
         }
@@ -16,10 +16,11 @@
             height: 300px;
             overflow-y: auto;
             border-radius: 5px;
+            margin-bottom: 10px;
         }
 
         input {
-            width: 80%;
+            width: 75%;
             padding: 10px;
         }
 
@@ -31,6 +32,11 @@
         #micBtn.listening {
             background-color: #ffcccc;
         }
+
+        video {
+            border-radius: 5px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 
@@ -38,7 +44,7 @@
 
 <h2>MindMate 💙</h2>
 
-<div id="chat-box"></div><br>
+<div id="chat-box"></div>
 
 <input type="text" id="user-input" placeholder="Type how you feel..." />
 <button onclick="sendMessage()">Send</button>
@@ -48,53 +54,21 @@
 <button id="micBtn">🎤 Speak</button>
 <p id="speechStatus"></p>
 
+<h3>Camera Status</h3>
+<video id="video" width="320" height="240" autoplay muted></video>
+<p id="faceStatus">Initializing camera...</p>
+
 <script>
-const micBtn = document.getElementById("micBtn");
-const statusText = document.getElementById("speechStatus");
+/* ------------------ CHAT HELPERS ------------------ */
 
-const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-let recognition;
-
-if (!SpeechRecognition) {
-    statusText.innerText = "Speech recognition not supported in this browser.";
-} else {
-    recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    micBtn.onclick = () => {
-        micBtn.disabled = true;
-        micBtn.classList.add("listening");
-        statusText.innerText = "🎤 Listening... Please speak";
-
-        recognition.start();
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.trim();
-
-        if (transcript.length === 0) {
-            statusText.innerText = "I couldn’t hear anything. Try again.";
-        } else {
-            statusText.innerText = "You said: " + transcript;
-            sendVoiceMessage(transcript);
-        }
-    };
-
-    recognition.onerror = () => {
-        statusText.innerText = "Speech error. Please try again.";
-    };
-
-    recognition.onend = () => {
-        micBtn.disabled = false;
-        micBtn.classList.remove("listening");
-    };
+function addSystemMessage(message) {
+    let chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<p style="color:gray"><i>MindMate:</i> ${message}</p>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Text input
+/* ------------------ TEXT CHAT ------------------ */
+
 async function sendMessage() {
     let text = document.getElementById("user-input").value.trim();
     if (!text) return;
@@ -103,12 +77,6 @@ async function sendMessage() {
     document.getElementById("user-input").value = "";
 }
 
-// Voice input
-async function sendVoiceMessage(text) {
-    await sendToBackend(text);
-}
-
-// Common backend call
 async function sendToBackend(text) {
     let chatBox = document.getElementById("chat-box");
     chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
@@ -128,7 +96,95 @@ async function sendToBackend(text) {
 
     chatBox.scrollTop = chatBox.scrollHeight;
 }
+
+/* ------------------ SPEECH TO TEXT ------------------ */
+
+const micBtn = document.getElementById("micBtn");
+const statusText = document.getElementById("speechStatus");
+
+const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition;
+
+if (!SpeechRecognition) {
+    statusText.innerText = "Speech recognition not supported.";
+} else {
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    micBtn.onclick = () => {
+        micBtn.disabled = true;
+        micBtn.classList.add("listening");
+        statusText.innerText = "🎤 Listening...";
+
+        recognition.start();
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        statusText.innerText = "You said: " + transcript;
+        sendToBackend(transcript);
+    };
+
+    recognition.onerror = () => {
+        statusText.innerText = "Speech error. Try again.";
+    };
+
+    recognition.onend = () => {
+        micBtn.disabled = false;
+        micBtn.classList.remove("listening");
+    };
+}
+
+/* ------------------ CAMERA ------------------ */
+
+const video = document.getElementById("video");
+const faceStatus = document.getElementById("faceStatus");
+
+let facePresent = false;
+let lastFaceState = false;
+
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: true
+        });
+        video.srcObject = stream;
+        faceStatus.innerText = "📷 Camera started.";
+        addSystemMessage("I’m here whenever you’re ready 💙");
+    } catch (error) {
+        faceStatus.innerText = "❌ Camera access denied.";
+        console.error(error);
+    }
+}
+
+// Start camera when page loads
+startCamera();
+
+/* ------------------ BASIC FACE PRESENCE (SIMULATED) ------------------ */
+/* Real face detection will be added later using ML / MediaPipe */
+
+setInterval(() => {
+    // For now we assume camera ON = face present
+    facePresent = video.srcObject !== null;
+
+    if (facePresent && !lastFaceState) {
+        addSystemMessage("🙂 I see you. How are you feeling today?");
+    }
+
+    if (!facePresent && lastFaceState) {
+        addSystemMessage("👀 I’ll be right here when you return.");
+    }
+
+    lastFaceState = facePresent;
+}, 3000);
+
 </script>
 
 </body>
 </html>
+
+
