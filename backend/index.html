@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>Project1 -- MindMate</title>
+    <script defer src="https://unpkg.com/face-api.js"></script>
+
 
     <style>
         body {
@@ -38,6 +40,7 @@
             margin-top: 10px;
         }
     </style>
+
 </head>
 
 <body>
@@ -181,7 +184,14 @@ setInterval(() => {
 
     lastFaceState = facePresent;
 }, 3000);
-
+async function loadFaceModels() {
+    await faceapi.nets.tinyFaceDetector.loadFromUri(
+        "https://cdn.jsdelivr.net/npm/face-api.js/models"
+    );
+}
+loadFaceModels().then(() => {
+    console.log("Face detection models loaded");
+});
 </script>
 
 </body>
