@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Project1 -- MindMate</title>
-    <script defer src="https://unpkg.com/face-api.js"></script>
 
+    <!-- Face API -->
+    <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
     <style>
         body {
@@ -40,7 +42,6 @@
             margin-top: 10px;
         }
     </style>
-
 </head>
 
 <body>
@@ -62,36 +63,37 @@
 <p id="faceStatus">Initializing camera...</p>
 
 <script>
-/* ------------------ CHAT HELPERS ------------------ */
+/* ================== STATE VARIABLES ================== */
+let facePresent = false;
+let lastFaceState = false;
 
+/* ================== HELPER FUNCTION ================== */
 function addSystemMessage(message) {
-    let chatBox = document.getElementById("chat-box");
+    const chatBox = document.getElementById("chat-box");
     chatBox.innerHTML += `<p style="color:gray"><i>MindMate:</i> ${message}</p>`;
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-/* ------------------ TEXT CHAT ------------------ */
-
+/* ================== TEXT CHAT ================== */
 async function sendMessage() {
-    let text = document.getElementById("user-input").value.trim();
+    const text = document.getElementById("user-input").value.trim();
     if (!text) return;
-
-    await sendToBackend(text);
     document.getElementById("user-input").value = "";
+    await sendToBackend(text);
 }
 
 async function sendToBackend(text) {
-    let chatBox = document.getElementById("chat-box");
+    const chatBox = document.getElementById("chat-box");
     chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
 
     try {
-        let response = await fetch("http://127.0.0.1:5000/predict", {
+        const response = await fetch("http://127.0.0.1:5000/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text })
         });
 
-        let data = await response.json();
+        const data = await response.json();
         chatBox.innerHTML += `<p><b>MindMate:</b> ${data.reply}</p>`;
     } catch {
         chatBox.innerHTML += `<p style="color:red">Error connecting to server</p>`;
@@ -100,101 +102,93 @@ async function sendToBackend(text) {
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-/* ------------------ SPEECH TO TEXT ------------------ */
-
+/* ================== SPEECH TO TEXT ================== */
 const micBtn = document.getElementById("micBtn");
 const statusText = document.getElementById("speechStatus");
 
 const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
-let recognition;
-
-if (!SpeechRecognition) {
-    statusText.innerText = "Speech recognition not supported.";
-} else {
-    recognition = new SpeechRecognition();
+if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.continuous = false;
-    recognition.interimResults = false;
 
     micBtn.onclick = () => {
-        micBtn.disabled = true;
         micBtn.classList.add("listening");
         statusText.innerText = "🎤 Listening...";
-
         recognition.start();
     };
 
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.trim();
+        const transcript = event.results[0][0].transcript;
+        micBtn.classList.remove("listening");
         statusText.innerText = "You said: " + transcript;
         sendToBackend(transcript);
     };
 
-    recognition.onerror = () => {
-        statusText.innerText = "Speech error. Try again.";
-    };
-
     recognition.onend = () => {
-        micBtn.disabled = false;
         micBtn.classList.remove("listening");
     };
+} else {
+    statusText.innerText = "Speech recognition not supported.";
 }
 
-/* ------------------ CAMERA ------------------ */
-
+/* ================== CAMERA ================== */
 const video = document.getElementById("video");
 const faceStatus = document.getElementById("faceStatus");
 
-let facePresent = false;
-let lastFaceState = false;
-
 async function startCamera() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: true
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        faceStatus.innerText = "📷 Camera started.";
+        faceStatus.innerText = "📷 Camera active";
         addSystemMessage("I’m here whenever you’re ready 💙");
     } catch (error) {
-        faceStatus.innerText = "❌ Camera access denied.";
+        faceStatus.innerText = "❌ Camera access denied";
         console.error(error);
     }
 }
 
-// Start camera when page loads
 startCamera();
 
-/* ------------------ BASIC FACE PRESENCE (SIMULATED) ------------------ */
-/* Real face detection will be added later using ML / MediaPipe */
-
-setInterval(() => {
-    // For now we assume camera ON = face present
-    facePresent = video.srcObject !== null;
-
-    if (facePresent && !lastFaceState) {
-        addSystemMessage("🙂 I see you. How are you feeling today?");
-    }
-
-    if (!facePresent && lastFaceState) {
-        addSystemMessage("👀 I’ll be right here when you return.");
-    }
-
-    lastFaceState = facePresent;
-}, 3000);
-async function loadFaceModels() {
+/* ================== FACE DETECTION ================== */
+async function loadModels() {
     await faceapi.nets.tinyFaceDetector.loadFromUri(
-        "https://cdn.jsdelivr.net/npm/face-api.js/models"
+        "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"
     );
+    startFaceDetection();
 }
-loadFaceModels().then(() => {
-    console.log("Face detection models loaded");
-});
+
+async function startFaceDetection() {
+    setInterval(async () => {
+        if (!video.srcObject) return;
+
+        const detections = await faceapi.detectAllFaces(
+            video,
+            new faceapi.TinyFaceDetectorOptions()
+        );
+
+        const facePresentNow = detections.length > 0;
+
+        // Face appeared
+        if (facePresentNow && !lastFaceState) {
+            faceStatus.innerText = "🙂 I see you. How are you feeling today?";
+            addSystemMessage("🙂 I see you. How are you feeling today?");
+        }
+
+        // Face disappeared
+        if (!facePresentNow && lastFaceState) {
+            faceStatus.innerText = "👀 I’ll be right here when you return.";
+            addSystemMessage("👀 I’ll be right here when you return 💙");
+        }
+
+        lastFaceState = facePresentNow;
+
+    }, 1500);
+}
+loadModels();
 </script>
 
 </body>
 </html>
-
-
