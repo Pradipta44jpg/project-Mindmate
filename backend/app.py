@@ -6,6 +6,9 @@ import re
 import nltk
 from nltk.corpus import stopwords
 
+# -------------------- Emotion Memory --------------------
+last_emotion = None
+
 # -------------------- Flask App --------------------
 app = Flask(__name__)
 CORS(app)
@@ -36,6 +39,8 @@ def home():
 # -------------------- Prediction Route --------------------
 @app.route("/predict", methods=["POST"])
 def predict_emotion():
+    global last_emotion
+
     data = request.json
     user_text = data.get("text", "")
 
@@ -44,7 +49,7 @@ def predict_emotion():
 
     clean_text = preprocess_text(user_text)
 
-    # -------- Emotion Keywords (Rule-based support) --------
+    # -------- Emotion Keywords --------
     emotion_keywords = {
         "sad": ["sad", "down", "unhappy", "cry", "depressed"],
         "happy": ["happy", "good", "great", "excited", "joy"],
@@ -57,60 +62,74 @@ def predict_emotion():
         "sad": [
             "I’m really sorry you’re feeling this way. I’m here with you.",
             "It sounds heavy. You don’t have to face this alone.",
-            "I’m listening. Take your time and share what you feel."
+            "I’m listening. Take your time."
         ],
         "happy": [
-            "That’s wonderful to hear 😊 I’m glad you’re feeling good.",
-            "Your happiness matters. Enjoy this moment.",
-            "I love hearing this. Keep smiling 😊"
+            "That’s wonderful to hear 😊",
+            "Your happiness matters.",
+            "I love hearing this 😊"
         ],
         "angry": [
-            "That sounds frustrating. Let’s take a deep breath together.",
-            "It’s okay to feel angry. I’m here to listen.",
-            "I understand this can be overwhelming."
+            "That sounds frustrating. I’m here.",
+            "It’s okay to feel angry.",
+            "Let’s slow down together."
         ],
         "lonely": [
-            "You’re not alone. I’m right here with you.",
-            "Even when it feels quiet, you still matter.",
-            "I’m here to keep you company."
+            "You’re not alone. I’m here.",
+            "I’m right here with you.",
+            "You still matter 💙"
         ],
         "neutral": [
-            "Thanks for sharing. How has your day been so far?",
-            "I’m here with you. Feel free to talk more.",
-            "It’s okay to feel neutral sometimes."
+            "I’m here with you.",
+            "Feel free to talk more.",
+            "It’s okay to feel neutral."
         ]
     }
 
     fallback_responses = [
-        "I’m here with you. Please tell me more.",
-        "Your feelings matter, even if they’re hard to explain.",
-        "I’m listening. Take your time.",
-        "It’s okay if you’re not sure how you feel."
+        "I’m listening.",
+        "Please tell me more.",
+        "Your feelings matter."
     ]
 
-    # -------- Keyword-based override (short but emotional inputs) --------
+    # -------- Keyword Override --------
     for emotion, keywords in emotion_keywords.items():
         for word in keywords:
             if word in clean_text.split():
+                last_emotion = emotion
                 return jsonify({
                     "emotion": emotion,
                     "reply": random.choice(emotion_responses[emotion])
                 })
 
-    # -------- Truly unclear input --------
+    # -------- Short / Unclear Input --------
     if len(clean_text.split()) < 3:
+      if last_emotion in ["sad", "lonely"]:
+        return jsonify({
+            "emotion": "neutral",
+            "reply": "I’m still here 💙 Earlier you sounded a bit low."
+        })
+    else:
         return jsonify({
             "emotion": "neutral",
             "reply": random.choice(emotion_responses["neutral"])
         })
 
+
     # -------- ML Prediction --------
     vector = vectorizer.transform([clean_text])
     prediction = model.predict(vector)[0]
 
-    reply = random.choice(
-        emotion_responses.get(prediction, fallback_responses)
-    )
+    # -------- Emotion Memory Logic (DAY 11 CORE) --------
+    previous_emotion = last_emotion
+    last_emotion = prediction
+
+    if previous_emotion in ["sad", "lonely"] and prediction == "neutral":
+        reply = "Welcome back 💙 Earlier you sounded a bit low. How are you feeling now?"
+    else:
+        reply = random.choice(
+            emotion_responses.get(prediction, fallback_responses)
+        )
 
     return jsonify({
         "emotion": prediction,
@@ -120,4 +139,3 @@ def predict_emotion():
 # -------------------- Run Server --------------------
 if __name__ == "__main__":
     app.run(debug=True)
-
