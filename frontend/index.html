@@ -76,24 +76,29 @@ function addSystemMessage(message) {
 
 /* ================== TEXT CHAT ================== */
 async function sendMessage() {
-    const text = document.getElementById("user-input").value.trim();
+    let text = document.getElementById("user-input").value.trim();
     if (!text) return;
+
+    await sendToBackend(text, "text");
     document.getElementById("user-input").value = "";
-    await sendToBackend(text);
 }
 
-async function sendToBackend(text) {
-    const chatBox = document.getElementById("chat-box");
+
+async function sendToBackend(text, source = "text") {
+    let chatBox = document.getElementById("chat-box");
     chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
 
     try {
-        const response = await fetch("http://127.0.0.1:5000/predict", {
+        let response = await fetch("http://127.0.0.1:5000/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ 
+                text: text,
+                source: source 
+            })
         });
 
-        const data = await response.json();
+        let data = await response.json();
         chatBox.innerHTML += `<p><b>MindMate:</b> ${data.reply}</p>`;
     } catch {
         chatBox.innerHTML += `<p style="color:red">Error connecting to server</p>`;
@@ -124,7 +129,8 @@ if (SpeechRecognition) {
         const transcript = event.results[0][0].transcript;
         micBtn.classList.remove("listening");
         statusText.innerText = "You said: " + transcript;
-        sendToBackend(transcript);
+        sendToBackend(transcript, "voice");
+
     };
 
     recognition.onend = () => {
