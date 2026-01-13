@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MindMate Chat 💙</title>
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="./css/style.css">
+
+  <!-- Face API -->
+  <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+
+<body class="chat-body">
+
+<!-- HEADER -->
+<header class="chat-header">
+  <div class="chat-title">
+    <span class="dot"></span>
+    MindMate 💙
+  </div>
+</header>
+
+<!-- CHAT -->
+<div class="chat-container">
+
+  <!-- Messages -->
+  <div class="chat-messages" id="chat-box">
+    <div class="message bot">
+      <p>Hello 👋 I’m MindMate.<br>How are you feeling today?</p>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="chat-input">
+    <input type="text" id="user-input" placeholder="Type how you feel..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+</div>
+
+<!-- Voice -->
+<div style="text-align:center; margin: 10px;">
+  <button id="micBtn">🎤 Speak</button>
+  <p id="speechStatus"></p>
+</div>
+
+<!-- Camera -->
+<div style="text-align:center;">
+ <div class="camera-box" id="cameraBox">
+  <video id="video" autoplay muted></video>
+  <div class="camera-status" id="faceStatus">
+    Camera active
+  </div>
+</div>
+
+<script>
+/* ================== STATE ================== */
+let lastFaceState = false;
+
+/* ================== CHAT ================== */
+function addSystemMessage(msg) {
+  const chatBox = document.getElementById("chat-box");
+  chatBox.innerHTML += `<div class="message bot"><p>${msg}</p></div>`;
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById("user-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+
+  const chatBox = document.getElementById("chat-box");
+  chatBox.innerHTML += `<div class="message user"><p>${text}</p></div>`;
+
+  try {
+    const res = await fetch("http://127.0.0.1:5000/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, source: "text" })
+    });
+
+    const data = await res.json();
+    addSystemMessage(data.reply);
+  } catch {
+    addSystemMessage("⚠️ Server not responding");
+  }
+}
+
+/* ================== SPEECH ================== */
+const micBtn = document.getElementById("micBtn");
+const statusText = document.getElementById("speechStatus");
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+
+  micBtn.onclick = () => {
+    micBtn.classList.add("listening");
+    statusText.innerText = "🎤 Listening...";
+    recognition.start();
+  };
+
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    micBtn.classList.remove("listening");
+    statusText.innerText = "You said: " + text;
+    sendToBackend(text);
+  };
+
+  recognition.onend = () => micBtn.classList.remove("listening");
+}
+
+function sendToBackend(text) {
+  const input = document.getElementById("user-input");
+  input.value = text;
+  sendMessage();
+}
+
+/* ================== CAMERA ================== */
+const video = document.getElementById("video");
+const faceStatus = document.getElementById("faceStatus");
+
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+  faceStatus.innerText = "📷 Camera active";
+}
+startCamera();
+
+/* ================== FACE DETECTION ================== */
+async function loadModels() {
+  await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+  startFaceDetection();
+}
+
+function startFaceDetection() {
+  setInterval(async () => {
+    const detections = await faceapi.detectAllFaces(
+      video,
+      new faceapi.TinyFaceDetectorOptions()
+    );
+
+    const faceNow = detections.length > 0;
+
+    if (faceNow && !lastFaceState) {
+      addSystemMessage("🙂 I see you. How are you feeling today?");
+    }
+
+    if (!faceNow && lastFaceState) {
+      addSystemMessage("👀 I’ll be right here when you return 💙");
+    }
+
+    lastFaceState = faceNow;
+  }, 800);
+}
+
+loadModels();
+</script>
+
+</body>
+</html>
