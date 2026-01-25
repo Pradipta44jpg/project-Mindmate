@@ -1,57 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>MindMate Chat 💙</title>
+<meta charset="UTF-8">
+<title>MindMate 💙</title>
 
-  <!-- Main CSS -->
-  <link rel="stylesheet" href="./css/style.css">
+<!-- Face API -->
+<script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-  <!-- Face API -->
-  <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<!-- Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+* {
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+}
+
+/* ====== HEADER ====== */
+header {
+    padding: 15px 40px;
+    background: white;
+    font-size: 22px;
+    font-weight: 600;
+    color: #4f6ef7;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* ====== MAIN LAYOUT ====== */
+.container {
+    display: flex;
+    height: calc(100vh - 70px);
+    padding: 20px;
+    gap: 20px;
+}
+
+/* ====== CHAT SECTION ====== */
+.chat-section {
+    flex: 2.2;
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.chat-header {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+#chat-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    border-radius: 10px;
+    background: #f1f3ff;
+}
+
+.chat-input {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+}
+
+.chat-input button {
+    padding: 12px 18px;
+    border-radius: 10px;
+    border: none;
+    background: #4f6ef7;
+    color: white;
+    cursor: pointer;
+}
+
+/* ====== CAMERA SECTION ====== */
+.camera-section {
+    flex: 1;
+    background: white;
+    border-radius: 16px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.camera-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+video {
+    width: 100%;
+    border-radius: 14px;
+    margin-top: 10px;
+}
+
+#faceStatus {
+    margin-top: 8px;
+    font-size: 14px;
+    color: gray;
+}
+
+/* ====== MIC BUTTON ====== */
+#micBtn {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #e9edff;
+    cursor: pointer;
+}
+
+#micBtn.listening {
+    background: #ffd6d6;
+}
+</style>
 </head>
 
-<body class="chat-body">
+<body>
 
-<!-- HEADER -->
-<header class="chat-header">
-  <div class="chat-title">
-    <span class="dot"></span>
-    MindMate 💙
-  </div>
-</header>
+<header>MindMate 💙</header>
 
-<!-- CHAT -->
-<div class="chat-container">
+<div class="container">
 
-  <!-- Messages -->
-  <div class="chat-messages" id="chat-box">
-    <div class="message bot">
-      <p>Hello 👋 I’m MindMate.<br>How are you feeling today?</p>
+    <!-- CHAT -->
+    <div class="chat-section">
+        <div class="chat-header">Hello 👋 I’m MindMate</div>
+        <p style="color:gray;">How are you feeling today?</p>
+
+        <div id="chat-box"></div>
+
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="Type how you feel..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+
+        <button id="micBtn">🎤 Speak</button>
+        <p id="speechStatus"></p>
     </div>
-  </div>
 
-  <!-- Input -->
-  <div class="chat-input">
-    <input type="text" id="user-input" placeholder="Type how you feel..." />
-    <button onclick="sendMessage()">Send</button>
-  </div>
+    <!-- CAMERA -->
+    <div class="camera-section">
+        <div class="camera-title">Presence Detection</div>
+        <video id="video" autoplay muted></video>
+        <p id="faceStatus">Initializing camera...</p>
+    </div>
 
-</div>
-
-<!-- Voice -->
-<div style="text-align:center; margin: 10px;">
-  <button id="micBtn">🎤 Speak</button>
-  <p id="speechStatus"></p>
-</div>
-
-<!-- Camera -->
-<div style="text-align:center;">
- <div class="camera-box" id="cameraBox">
-  <video id="video" autoplay muted></video>
-  <div class="camera-status" id="faceStatus">
-    Camera active
-  </div>
 </div>
 
 <script>
@@ -60,64 +166,61 @@ let lastFaceState = false;
 
 /* ================== CHAT ================== */
 function addSystemMessage(msg) {
-  const chatBox = document.getElementById("chat-box");
-  chatBox.innerHTML += `<div class="message bot"><p>${msg}</p></div>`;
-  chatBox.scrollTop = chatBox.scrollHeight;
+    const chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<p style="color:gray"><i>MindMate:</i> ${msg}</p>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 async function sendMessage() {
-  const input = document.getElementById("user-input");
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
+    const input = document.getElementById("user-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    sendToBackend(text, "text");
+}
 
-  const chatBox = document.getElementById("chat-box");
-  chatBox.innerHTML += `<div class="message user"><p>${text}</p></div>`;
+async function sendToBackend(text, source) {
+    const chatBox = document.getElementById("chat-box");
+    chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
 
-  try {
-    const res = await fetch("http://127.0.0.1:5000/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, source: "text" })
-    });
+    try {
+        const res = await fetch("http://127.0.0.1:5000/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, source })
+        });
+        const data = await res.json();
+        chatBox.innerHTML += `<p><b>MindMate:</b> ${data.reply}</p>`;
+    } catch {
+        chatBox.innerHTML += `<p style="color:red">Server error</p>`;
+    }
 
-    const data = await res.json();
-    addSystemMessage(data.reply);
-  } catch {
-    addSystemMessage("⚠️ Server not responding");
-  }
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 /* ================== SPEECH ================== */
 const micBtn = document.getElementById("micBtn");
 const statusText = document.getElementById("speechStatus");
-const SpeechRecognition =
-  window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 if (SpeechRecognition) {
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
 
-  micBtn.onclick = () => {
-    micBtn.classList.add("listening");
-    statusText.innerText = "🎤 Listening...";
-    recognition.start();
-  };
+    micBtn.onclick = () => {
+        micBtn.classList.add("listening");
+        statusText.innerText = "Listening...";
+        recognition.start();
+    };
 
-  recognition.onresult = e => {
-    const text = e.results[0][0].transcript;
-    micBtn.classList.remove("listening");
-    statusText.innerText = "You said: " + text;
-    sendToBackend(text);
-  };
+    recognition.onresult = e => {
+        const text = e.results[0][0].transcript;
+        micBtn.classList.remove("listening");
+        statusText.innerText = "You said: " + text;
+        sendToBackend(text, "voice");
+    };
 
-  recognition.onend = () => micBtn.classList.remove("listening");
-}
-
-function sendToBackend(text) {
-  const input = document.getElementById("user-input");
-  input.value = text;
-  sendMessage();
+    recognition.onend = () => micBtn.classList.remove("listening");
 }
 
 /* ================== CAMERA ================== */
@@ -125,37 +228,39 @@ const video = document.getElementById("video");
 const faceStatus = document.getElementById("faceStatus");
 
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  video.srcObject = stream;
-  faceStatus.innerText = "📷 Camera active";
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    faceStatus.innerText = "📷 Camera active";
 }
 startCamera();
 
 /* ================== FACE DETECTION ================== */
 async function loadModels() {
-  await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
-  startFaceDetection();
+    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+    startFaceDetection();
 }
 
 function startFaceDetection() {
-  setInterval(async () => {
-    const detections = await faceapi.detectAllFaces(
-      video,
-      new faceapi.TinyFaceDetectorOptions()
-    );
+    setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(
+            video,
+            new faceapi.TinyFaceDetectorOptions()
+        );
 
-    const faceNow = detections.length > 0;
+        const faceNow = detections.length > 0;
 
-    if (faceNow && !lastFaceState) {
-      addSystemMessage("🙂 I see you. How are you feeling today?");
-    }
+        if (faceNow && !lastFaceState) {
+            addSystemMessage("🙂 I see you. How are you feeling?");
+            faceStatus.innerText = "🙂 User present";
+        }
 
-    if (!faceNow && lastFaceState) {
-      addSystemMessage("👀 I’ll be right here when you return 💙");
-    }
+        if (!faceNow && lastFaceState) {
+            addSystemMessage("👀 I’ll be right here when you return.");
+            faceStatus.innerText = "No face detected";
+        }
 
-    lastFaceState = faceNow;
-  }, 800);
+        lastFaceState = faceNow;
+    }, 1000);
 }
 
 loadModels();
@@ -163,3 +268,4 @@ loadModels();
 
 </body>
 </html>
+
