@@ -33,3 +33,12 @@ except requests.exceptions.ConnectionError:
     print("❌ Cannot connect to Flask server. Make sure it is running.")
 except requests.exceptions.RequestException as e:
     print("❌ Request failed:", e)
+from transformers import pipeline
+
+# Load emotion model
+emotion_classifier = pipeline("text-classification", 
+                              model="j-hartmann/emotion-english-distilroberta-base")
+
+def detect_emotion(text):
+    result = emotion_classifier(text)
+    return result
