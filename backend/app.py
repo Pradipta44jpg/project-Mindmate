@@ -5,18 +5,22 @@ import pickle
 import re
 import nltk
 from nltk.corpus import stopwords
+import anthropic
+import base64
 
 last_emotion = None
 
 app = Flask(__name__)
 CORS(app)
 
+# ---------------- Load ML Model ----------------
 with open("emotion_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 with open("tfidf_vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
+# ---------------- NLP Setup ----------------
 nltk.download("stopwords")
 stop_words = set(stopwords.words("english"))
 
@@ -27,10 +31,15 @@ def preprocess_text(text):
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
+# ---------------- Anthropic Setup ----------------
+client = anthropic.Anthropic(api_key="YOUR_API_KEY")
+
+# ---------------- Home Route ----------------
 @app.route("/")
 def home():
     return "MindMate Backend Running"
 
+# ---------------- Chat Emotion Detection ----------------
 @app.route("/predict", methods=["POST"])
 def predict_emotion():
     global last_emotion
@@ -43,7 +52,6 @@ def predict_emotion():
 
     clean_text = preprocess_text(user_text)
 
-    # Greeting detection
     greetings = ["hi", "hello", "hey"]
     if clean_text in greetings:
         return jsonify({
@@ -51,7 +59,6 @@ def predict_emotion():
             "reply": "Hello 👋 I'm MindMate. How are you feeling today?"
         })
 
-    # Question detection
     question_words = ["how", "what", "why", "are", "do", "can"]
     if any(word in user_text.lower().split() for word in question_words):
         return jsonify({
@@ -110,8 +117,6 @@ def predict_emotion():
     vector = vectorizer.transform([clean_text])
     prediction = model.predict(vector)[0]
 
-    print("Predicted emotion:", prediction)
-
     previous_emotion = last_emotion
     last_emotion = prediction
 
@@ -127,5 +132,28 @@ def predict_emotion():
         "reply": reply
     })
 
+# ---------------- Face Emotion Detection ----------------
+@app.route("/analyze-mood", methods=["POST"])
+def analyze_mood():
+    data = request.json
+    image_base64 = data.get("image")
+
+    response = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=500,
+        system="You are MindMate, a warm empathetic mental wellness companion.",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_base64}},
+                {"type": "text", "text": "Detect my mood and respond kindly."}
+            ]
+        }]
+    )
+
+    text = response.content[0].text
+    return jsonify({"reply": text})
+
+# ---------------- Run Server ----------------
 if __name__ == "__main__":
     app.run(debug=True)
