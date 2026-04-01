@@ -138,19 +138,14 @@ def analyze_mood():
     data = request.json
     image_base64 = data.get("image")
 
-    response = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=500,
-        system="You are MindMate, a warm empathetic mental wellness companion.",
-        messages=[{
-            "role": "user",
-            "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_base64}},
-                {"type": "text", "text": "Detect my mood and respond kindly."}
-            ]
-        }]
-    )
+    if not image_base64:
+        return jsonify({"reply": "I couldn't see your face clearly."})
 
+    print("Image received from frontend")
+
+    return jsonify({
+        "reply": "Hello! I can see you 😊 How are you feeling today?"
+    })
     text = response.content[0].text
     return jsonify({"reply": text})
 

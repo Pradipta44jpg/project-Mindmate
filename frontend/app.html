@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-    
 <head>
 <meta charset="UTF-8">
 <title>MindMate 💙</title>
 
-<!-- Face API -->
 <script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-<!-- Google Font -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
@@ -22,7 +19,6 @@ body {
     background: #f5f7fb;
 }
 
-/* ====== HEADER ====== */
 header {
     padding: 15px 40px;
     background: white;
@@ -32,7 +28,6 @@ header {
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
-/* ====== MAIN LAYOUT ====== */
 .container {
     display: flex;
     height: calc(100vh - 70px);
@@ -40,7 +35,6 @@ header {
     gap: 20px;
 }
 
-/* ====== CHAT SECTION ====== */
 .chat-section {
     flex: 2.2;
     background: white;
@@ -54,7 +48,6 @@ header {
 .chat-header {
     font-size: 20px;
     font-weight: 600;
-    margin-bottom: 10px;
 }
 
 #chat-box {
@@ -63,6 +56,7 @@ header {
     padding: 10px;
     border-radius: 10px;
     background: #f1f3ff;
+    margin-top: 10px;
 }
 
 .chat-input {
@@ -87,7 +81,6 @@ header {
     cursor: pointer;
 }
 
-/* ====== CAMERA SECTION ====== */
 .camera-section {
     flex: 1;
     background: white;
@@ -97,24 +90,11 @@ header {
     box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-.camera-title {
-    font-weight: 600;
-    margin-bottom: 10px;
-}
-
 video {
     width: 100%;
     border-radius: 14px;
-    margin-top: 10px;
 }
 
-#faceStatus {
-    margin-top: 8px;
-    font-size: 14px;
-    color: gray;
-}
-
-/* ====== MIC BUTTON ====== */
 #micBtn {
     margin-top: 10px;
     padding: 10px;
@@ -122,10 +102,6 @@ video {
     border: none;
     background: #e9edff;
     cursor: pointer;
-}
-
-#micBtn.listening {
-    background: #ffd6d6;
 }
 </style>
 </head>
@@ -136,113 +112,116 @@ video {
 
 <div class="container">
 
-    <!-- CHAT -->
-    <div class="chat-section">
-        <div class="chat-header">Hello 👋 I’m MindMate</div>
-        <p style="color:gray;">How are you feeling today?</p>
+<div class="chat-section">
+<div class="chat-header">Hello 👋 I'm MindMate</div>
+<p style="color:gray;">I'm here to listen to you.</p>
 
-        <div id="chat-box"></div>
+<div id="chat-box"></div>
 
-        <div class="chat-input">
-            <input type="text" id="user-input" placeholder="Type how you feel..." />
-            <button onclick="sendMessage()">Send</button>
-        </div>
+<div class="chat-input">
+<input type="text" id="user-input" placeholder="Type how you feel..." />
+<button onclick="sendMessage()">Send</button>
+</div>
 
-        <button id="micBtn">🎤 Speak</button>
-        <p id="speechStatus"></p>
-    </div>
+<button id="micBtn">🎤 Speak</button>
+<p id="speechStatus"></p>
 
-    <!-- CAMERA -->
-    <div class="camera-section">
-        <div class="camera-title">Presence Detection</div>
-        <video id="video" autoplay muted></video>
-        <p id="faceStatus">Initializing camera...</p>
-    </div>
+</div>
+
+<div class="camera-section">
+<h3>Presence Detection</h3>
+<video id="video" autoplay muted></video>
+<canvas id="snapshot" style="display:none;"></canvas>
+<p id="faceStatus">Starting camera...</p>
+</div>
 
 </div>
 
 <script>
-/* ================== STATE ================== */
 let lastFaceState = false;
 
-/* ================== CHAT ================== */
+const video = document.getElementById("video");
+const faceStatus = document.getElementById("faceStatus");
+const chatBox = document.getElementById("chat-box");
+
+/* ADD MESSAGE */
 function addSystemMessage(msg) {
-    const chatBox = document.getElementById("chat-box");
-    chatBox.innerHTML += `<p style="color:gray"><i>MindMate:</i> ${msg}</p>`;
+    chatBox.innerHTML += `<p style="color:gray"><b>MindMate:</b> ${msg}</p>`;
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+/* SEND TEXT MESSAGE */
 async function sendMessage() {
     const input = document.getElementById("user-input");
     const text = input.value.trim();
     if (!text) return;
-    input.value = "";
-    sendToBackend(text, "text");
-}
 
-async function sendToBackend(text, source) {
-    const chatBox = document.getElementById("chat-box");
     chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
+    input.value = "";
 
     try {
         const res = await fetch("http://127.0.0.1:5000/predict", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, source })
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ text })
         });
+
         const data = await res.json();
-        chatBox.innerHTML += `<p><b>MindMate:</b> ${data.reply}</p>`;
+        addSystemMessage(data.reply);
     } catch {
-        chatBox.innerHTML += `<p style="color:red">Server error</p>`;
+        addSystemMessage("Server not responding.");
     }
-
-    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-/* ================== SPEECH ================== */
-const micBtn = document.getElementById("micBtn");
-const statusText = document.getElementById("speechStatus");
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-if (SpeechRecognition) {
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-
-    micBtn.onclick = () => {
-        micBtn.classList.add("listening");
-        statusText.innerText = "Listening...";
-        recognition.start();
-    };
-
-    recognition.onresult = e => {
-        const text = e.results[0][0].transcript;
-        micBtn.classList.remove("listening");
-        statusText.innerText = "You said: " + text;
-        sendToBackend(text, "voice");
-    };
-
-    recognition.onend = () => micBtn.classList.remove("listening");
-}
-
-/* ================== CAMERA ================== */
-const video = document.getElementById("video");
-const faceStatus = document.getElementById("faceStatus");
-
+/* CAMERA */
 async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-    faceStatus.innerText = "📷 Camera active";
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        faceStatus.innerText = "Camera active";
+    } catch (error) {
+        faceStatus.innerText = "Camera permission denied";
+    }
 }
-startCamera();
 
-/* ================== FACE DETECTION ================== */
+/* LOAD MODEL */
 async function loadModels() {
-    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
-    startFaceDetection();
+    await faceapi.nets.tinyFaceDetector.loadFromUri("models");
+    console.log("Face model loaded");
 }
 
+/* CAPTURE IMAGE */
+async function analyzeMoodFromCamera() {
+    const canvas = document.getElementById("snapshot");
+    const context = canvas.getContext("2d");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    context.drawImage(video, 0, 0);
+
+    const imageBase64 = canvas.toDataURL("image/jpeg").split(",")[1];
+
+    try {
+        const res = await fetch("http://127.0.0.1:5000/analyze-mood", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ image: imageBase64 })
+        });
+
+        const data = await res.json();
+        addSystemMessage(data.reply);
+    } catch {
+        addSystemMessage("Mood detection failed.");
+    }
+}
+
+/* FACE DETECTION */
 function startFaceDetection() {
     setInterval(async () => {
+
+        if (video.readyState !== 4) return;
+
         const detections = await faceapi.detectAllFaces(
             video,
             new faceapi.TinyFaceDetectorOptions()
@@ -251,22 +230,44 @@ function startFaceDetection() {
         const faceNow = detections.length > 0;
 
         if (faceNow && !lastFaceState) {
-            addSystemMessage("🙂 I see you. How are you feeling?");
-            faceStatus.innerText = "🙂 User present";
+            faceStatus.innerText = "Face detected";
+            analyzeMoodFromCamera();
         }
 
         if (!faceNow && lastFaceState) {
-            addSystemMessage("👀 I’ll be right here when you return.");
             faceStatus.innerText = "No face detected";
         }
 
         lastFaceState = faceNow;
-    }, 1000);
+
+    }, 1500);
 }
 
-loadModels();
+/* INIT */
+async function init() {
+    await startCamera();
+    await loadModels();
+    startFaceDetection();
+}
+
+init();
+
+/* SPEECH */
+const micBtn = document.getElementById("micBtn");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+
+    micBtn.onclick = () => recognition.start();
+
+    recognition.onresult = e => {
+        const text = e.results[0][0].transcript;
+        sendMessage(text);
+    };
+}
 </script>
 
 </body>
 </html>
-
