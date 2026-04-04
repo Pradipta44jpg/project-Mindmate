@@ -25,29 +25,21 @@ header {
     font-size: 22px;
     font-weight: 600;
     color: #4f6ef7;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
-
 .container {
     display: flex;
-    height: calc(100vh - 70px);
+    min-height: calc 100vh;
     padding: 20px;
     gap: 20px;
 }
-
 .chat-section {
     flex: 2.2;
-    background: white;
+    background: rgb(245, 149, 149);
     border-radius: 16px;
     padding: 20px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.chat-header {
-    font-size: 20px;
-    font-weight: 600;
+    height: 90vh; /* ✅ important */
 }
 
 #chat-box {
@@ -58,50 +50,20 @@ header {
     background: #f1f3ff;
     margin-top: 10px;
 }
-
 .chat-input {
     display: flex;
     gap: 10px;
     margin-top: 10px;
 }
 
-.chat-input input {
-    flex: 1;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #ccc;
-}
-
-.chat-input button {
-    padding: 12px 18px;
-    border-radius: 10px;
-    border: none;
-    background: #4f6ef7;
-    color: white;
-    cursor: pointer;
-}
-
 .camera-section {
     flex: 1;
     background: white;
-    border-radius: 16px;
     padding: 15px;
-    text-align: center;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
 video {
     width: 100%;
-    border-radius: 14px;
-}
-
-#micBtn {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 8px;
-    border: none;
-    background: #e9edff;
-    cursor: pointer;
 }
 </style>
 </head>
@@ -113,160 +75,144 @@ video {
 <div class="container">
 
 <div class="chat-section">
-<div class="chat-header">Hello 👋 I'm MindMate</div>
-<p style="color:gray;">I'm here to listen to you.</p>
-
+<h2>Hello 👋 I'm MindMate</h2>
 <div id="chat-box"></div>
-
 <div class="chat-input">
-<input type="text" id="user-input" placeholder="Type how you feel..." />
-<button onclick="sendMessage()">Send</button>
+    <input type="text" id="userInput" placeholder="Type your message..." />
+    <button onclick="sendMessage()">Send</button>
 </div>
-
-<button id="micBtn">🎤 Speak</button>
-<p id="speechStatus"></p>
 
 </div>
 
 <div class="camera-section">
-<h3>Presence Detection</h3>
+<h3>Camera</h3>
 <video id="video" autoplay muted></video>
-<canvas id="snapshot" style="display:none;"></canvas>
-<p id="faceStatus">Starting camera...</p>
+<p id="faceStatus">Starting...</p>
 </div>
 
 </div>
 
 <script>
-let lastFaceState = false;
+let moodSent = false;
 
 const video = document.getElementById("video");
 const faceStatus = document.getElementById("faceStatus");
 const chatBox = document.getElementById("chat-box");
-
-/* ADD MESSAGE */
-function addSystemMessage(msg) {
-    chatBox.innerHTML += `<p style="color:gray"><b>MindMate:</b> ${msg}</p>`;
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-/* SEND TEXT MESSAGE */
 async function sendMessage() {
-    const input = document.getElementById("user-input");
-    const text = input.value.trim();
-    if (!text) return;
+    const input = document.getElementById("userInput");
+    const message = input.value.trim();
 
-    chatBox.innerHTML += `<p><b>You:</b> ${text}</p>`;
+    if (message === "") return;
+
+    // Show user message
+    const userMsg = document.createElement("p");
+    userMsg.innerHTML = "<b>You:</b> " + message;
+    chatBox.appendChild(userMsg);
+
     input.value = "";
 
     try {
-        const res = await fetch("http://127.0.0.1:5000/predict", {
+        // 🔥 SEND TO FLASK BACKEND
+        const response = await fetch("http://127.0.0.1:5000/predict", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ text })
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ text: message })
         });
 
-        const data = await res.json();
-        addSystemMessage(data.reply);
-    } catch {
-        addSystemMessage("Server not responding.");
+        const data = await response.json();
+
+        // ✅ SHOW REAL AI RESPONSE
+        addMessage(data.reply);
+
+    } catch (error) {
+        console.log("Error:", error);
+        addMessage("⚠️ Server not responding");
+    }
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+/* ADD MESSAGE */
+function addMessage(msg) {
+    chatBox.innerHTML += `<p><b>MindMate:</b> ${msg}</p>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+/* HANDLE MOOD */
+function handleMood(mood) {
+    console.log("Mood:", mood);
+
+    if (mood === "happy") {
+        addMessage("You look happy 😊 That’s nice to see!");
+    }
+    else if (mood === "sad") {
+        addMessage("You look a bit down… I’m here for you 💙");
+    }
+    else if (mood === "angry") {
+        addMessage("You seem stressed… want to talk?");
+    }
+    else {
+        addMessage("Hi 😊 I see you. How are you feeling?");
     }
 }
 
 /* CAMERA */
 async function startCamera() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        faceStatus.innerText = "Camera active";
-    } catch (error) {
-        faceStatus.innerText = "Camera permission denied";
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    faceStatus.innerText = "Camera active";
 }
 
-/* LOAD MODEL */
+/* LOAD MODELS */
 async function loadModels() {
     await faceapi.nets.tinyFaceDetector.loadFromUri("models");
-    console.log("Face model loaded");
-}
-
-/* CAPTURE IMAGE */
-async function analyzeMoodFromCamera() {
-    const canvas = document.getElementById("snapshot");
-    const context = canvas.getContext("2d");
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    context.drawImage(video, 0, 0);
-
-    const imageBase64 = canvas.toDataURL("image/jpeg").split(",")[1];
-
-    try {
-        const res = await fetch("http://127.0.0.1:5000/analyze-mood", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ image: imageBase64 })
-        });
-
-        const data = await res.json();
-        addSystemMessage(data.reply);
-    } catch {
-        addSystemMessage("Mood detection failed.");
-    }
+    await faceapi.nets.faceExpressionNet.loadFromUri("models");
+    console.log("Models loaded");
 }
 
 /* FACE DETECTION */
-function startFaceDetection() {
+function detectFace() {
     setInterval(async () => {
 
         if (video.readyState !== 4) return;
 
-        const detections = await faceapi.detectAllFaces(
-            video,
-            new faceapi.TinyFaceDetectorOptions()
+        const result = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceExpressions();
+
+        if (!result) {
+            faceStatus.innerText = "No face detected";
+            moodSent = false;
+            return;
+        }
+
+        faceStatus.innerText = "Face detected";
+
+        const expressions = result.expressions;
+
+        const mood = Object.keys(expressions).reduce((a, b) =>
+            expressions[a] > expressions[b] ? a : b
         );
 
-        const faceNow = detections.length > 0;
-
-        if (faceNow && !lastFaceState) {
-            faceStatus.innerText = "Face detected";
-            analyzeMoodFromCamera();
+        // Send ONLY once
+        if (!moodSent) {
+            handleMood(mood);
+            moodSent = true;
         }
 
-        if (!faceNow && lastFaceState) {
-            faceStatus.innerText = "No face detected";
-        }
-
-        lastFaceState = faceNow;
-
-    }, 1500);
+    }, 2000);
 }
 
 /* INIT */
 async function init() {
     await startCamera();
     await loadModels();
-    startFaceDetection();
+    detectFace();
 }
 
 init();
-
-/* SPEECH */
-const micBtn = document.getElementById("micBtn");
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-if (SpeechRecognition) {
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-
-    micBtn.onclick = () => recognition.start();
-
-    recognition.onresult = e => {
-        const text = e.results[0][0].transcript;
-        sendMessage(text);
-    };
-}
 </script>
 
 </body>
